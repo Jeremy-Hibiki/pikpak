@@ -29,7 +29,7 @@
           <n-form-item label="aria2链接：">
             <n-input
               v-model:value="aria2Data.host"
-              placeholder="例如http://localhost:6800/jsonrpc"
+              placeholder="默认http://localhost:6800/jsonrpc"
             ></n-input>
           </n-form-item>
           <n-form-item label="aria2Token：">
@@ -37,6 +37,7 @@
               v-model:value="aria2Data.token"
               type="password"
               show-password-on="mousedown"
+              :input-props="{ autocomplete: 'off' }"
             ></n-input>
           </n-form-item>
           <n-form-item label="文件夹设置：">
@@ -102,8 +103,10 @@
           placeholder="支持多个随机，一行一个，为空则不代理"
         ></n-input>
         <p></p>
-        <n-button type="primary" @click="proxyPost">保存设置</n-button>
-        <n-text @click="proxyReset">恢复默认</n-text>
+        <n-space>
+          <n-button type="primary" @click="proxyPost">保存设置</n-button>
+          <n-button @click="proxyReset">恢复默认</n-button>
+        </n-space>
       </n-collapse-item>
       <n-collapse-item title="关于" name="2">
         <n-space>
@@ -183,7 +186,7 @@ const testAria2 = () => {
   if (aria2Data.value.token) {
     postData.params.splice(0, 0, 'token:' + aria2Data.value.token);
   }
-  fetch(aria2Data.value.host, {
+  fetch(aria2Data.value.host || 'http://localhost:6800/jsonrpc', {
     method: 'POST',
     body: JSON.stringify(postData),
     headers: new Headers({
