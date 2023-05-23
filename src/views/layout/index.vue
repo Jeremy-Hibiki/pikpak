@@ -47,7 +47,7 @@
             src="../../assets/logo1.png"
             class="user-info-avatar"
           />
-          <img v-else src="https://www.mypikpak.com/logo.png" class="user-info-avatar" />
+          <img v-else src="../../assets/pikpak-logo.png" class="user-info-avatar" />
           <div class="user-info-name">
             {{ userInfo?.name }}
             <div v-if="vipInfo?.status === 'ok' && vipInfo?.expire">

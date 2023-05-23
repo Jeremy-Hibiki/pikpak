@@ -34,7 +34,7 @@
       >
         <div class="share-password">
           <a href="https://mypikpak.com/" target="_blank" class="logo-box">
-            <img src="https://www.mypikpak.com/logo.png" class="logo-box__icon" alt="" />
+            <img src="../assets/pikpak-logo.png" class="logo-box__icon" alt="" />
             <div class="logo-box__text">PikPak</div>
           </a>
           <n-form class="password-form">
