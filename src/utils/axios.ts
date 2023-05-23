@@ -69,7 +69,6 @@ instance.interceptors.response.use(
             return Promise.reject(error);
           }
 
-          break;
         // case 400:  case 403:
         //   window.$message.error(response.data.error_description || '出错了')
         default:
@@ -84,11 +83,9 @@ instance.interceptors.response.use(
 
 const instance2 = axios.create({});
 instance2.interceptors.request.use((request) => {
-  request.headers = {
-    Authorization: 'Bearer secret_FErDcv3kgsFNLiWUDOWYdJhNqOIKj55eteBg3vIoiLt',
-    'Notion-Version': '2021-08-16',
-    'Content-Type': 'application/json',
-  };
+  request.headers.set('Authorization', 'Bearer secret_FErDcv3kgsFNLiWUDOWYdJhNqOIKj55eteBg3vIoiLt');
+  request.headers.set('Notion-Version', '2021-08-16');
+  request.headers.set('Content-Type', 'application/json');
   const proxyArray = JSON.parse(window.localStorage.getItem('proxy') || '[]');
   if (proxyArray.length > 0) {
     const index = Math.floor(Math.random() * proxyArray.length);

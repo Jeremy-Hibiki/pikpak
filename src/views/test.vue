@@ -58,7 +58,7 @@ const uploadRef = ref();
 const route = useRoute();
 const fileListRef = ref<UploadFileInfo[]>();
 const max = ref(5);
-const uploadig = ref(0);
+const uploading = ref(0);
 const fileUpload = ref<{
   [key: string]: {
     oss?: any;
@@ -67,15 +67,8 @@ const fileUpload = ref<{
     retry?: number;
   };
 }>({});
-const changeFile = async ({ fileList }: { fileList: UploadFileInfo[] }) => {
-  fileListRef.value = fileList;
-  const maxLengt = fileList.length > max.value ? max.value : fileList.length;
-  for (let i = uploadig.value; i < maxLengt; i++) {
-    postFile();
-  }
-};
 const postFile = async () => {
-  if (uploadig.value >= max.value) {
+  if (uploading.value >= max.value) {
     return false;
   }
   let fileInfo: UploadFileInfo | undefined = undefined;
@@ -89,8 +82,8 @@ const postFile = async () => {
   }
   if (!fileInfo) {
     max.value = 1;
-    console.log(max.value, uploadig.value);
-    if (uploadig.value >= max.value) {
+    console.log(max.value, uploading.value);
+    if (uploading.value >= max.value) {
       return false;
     }
     if (fileListRef.value) {
@@ -114,7 +107,7 @@ const postFile = async () => {
     return false;
   }
   fileInfo.status = 'uploading';
-  uploadig.value++;
+  uploading.value++;
   if (!fileUpload.value[fileInfo.id]) {
     fileUpload.value[fileInfo.id] = {
       gcid: 0,
@@ -146,15 +139,15 @@ const postFile = async () => {
   }
   try {
     const localStorageKey = 'pikpakUpload-' + gcidItem;
-    let uplodaInfo: any = window.localStorage.getItem(localStorageKey);
-    uplodaInfo = uplodaInfo && JSON.parse(uplodaInfo);
+    let uploadInfo: any = window.localStorage.getItem(localStorageKey);
+    uploadInfo = uploadInfo && JSON.parse(uploadInfo);
     if (
-      !uplodaInfo?.data?.resumable?.params?.expiration ||
-      new Date(uplodaInfo?.data?.resumable?.params?.expiration) < new Date()
+      !uploadInfo?.data?.resumable?.params?.expiration ||
+      new Date(uploadInfo?.data?.resumable?.params?.expiration) < new Date()
     ) {
-      uplodaInfo = false;
+      uploadInfo = false;
     }
-    if (!uplodaInfo) {
+    if (!uploadInfo) {
       let postData = {
         kind: 'drive#file',
         parent_id: route.params.id || undefined,
@@ -166,9 +159,9 @@ const postFile = async () => {
           provider: 'UPLOAD_TYPE_UNKNOWN',
         },
       };
-      uplodaInfo = await http.post('https://api-drive.mypikpak.com/drive/v1/files', postData);
+      uploadInfo = await http.post('https://api-drive.mypikpak.com/drive/v1/files', postData);
     }
-    const { upload_type, resumable } = uplodaInfo.data;
+    const { upload_type, resumable } = uploadInfo.data;
     if (upload_type === 'UPLOAD_TYPE_RESUMABLE') {
       const oss = new OSS({
         accessKeyId: resumable.params.access_key_id,
@@ -181,7 +174,7 @@ const postFile = async () => {
       });
       fileUpload.value[fileInfo.id].oss = oss;
       try {
-        const ossPrarams: any = {
+        const ossParams: any = {
           partSize: 1024000,
           parallel: 3,
           timeout: 60000,
@@ -194,25 +187,25 @@ const postFile = async () => {
               fileInfo.percentage = p * 100;
             }
             if (checkpoint) {
-              uplodaInfo.data.checkpoint = checkpoint;
-              window.localStorage.setItem(localStorageKey, JSON.stringify(uplodaInfo));
+              uploadInfo.data.checkpoint = checkpoint;
+              window.localStorage.setItem(localStorageKey, JSON.stringify(uploadInfo));
             }
           },
         };
-        if (uplodaInfo.data.checkpoint) {
-          ossPrarams.checkpoint = uplodaInfo.data.checkpoint;
+        if (uploadInfo.data.checkpoint) {
+          ossParams.checkpoint = uploadInfo.data.checkpoint;
         }
-        const result = await oss.multipartUpload(resumable.params.key, fileInfo.file, ossPrarams);
+        const result = await oss.multipartUpload(resumable.params.key, fileInfo.file, ossParams);
         fileInfo.status = 'finished';
         fileInfo.percentage = 100;
-        uploadig.value--;
+        uploading.value--;
         fileInfo.name = fileInfo.name.replace('-正在效验文件', '').replace('-正在上传文件', '');
         window.localStorage.removeItem(localStorageKey);
         postFile();
         console.log(result);
       } catch (error) {
         console.log(error);
-        uploadig.value--;
+        uploading.value--;
         fileInfo.name = fileInfo.name.replace('-正在效验文件', '').replace('-正在上传文件', '');
         fileInfo.status = 'error';
         if ((fileUpload.value[fileInfo.id].retry || 0) < 3) {
@@ -224,14 +217,21 @@ const postFile = async () => {
       fileInfo.name = fileInfo.name.replace('-正在效验文件', '').replace('-正在上传文件', '');
       fileInfo.status = 'finished';
       fileInfo.percentage = 100;
-      uploadig.value--;
+      uploading.value--;
       window.localStorage.removeItem(localStorageKey);
       postFile();
     }
   } catch (error) {}
 };
+const changeFile = async ({ fileList }: { fileList: UploadFileInfo[] }) => {
+  fileListRef.value = fileList;
+  const maxLength = fileList.length > max.value ? max.value : fileList.length;
+  for (let i = uploading.value; i < maxLength; i++) {
+    postFile();
+  }
+};
 const moveFile = ({ file }: { file: UploadFileInfo }) => {
-  if (file.status === 'uploading' && file.id && uploadig.value && fileUpload.value[file.id]) {
+  if (file.status === 'uploading' && file.id && uploading.value && fileUpload.value[file.id]) {
     fileUpload.value[file.id].oss.cancel();
   }
   if (fileListRef.value) {

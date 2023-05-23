@@ -100,7 +100,7 @@
           </n-icon>
         </template>
         <n-alert :show-icon="false" closable title="添加说明">
-          <div>1.支持Magnet链接(magnet:?xt=urn)，Magent链接只能默认保存到My Pack</div>
+          <div>1.支持Magnet链接(magnet:?xt=urn)，Magnet链接只能默认保存到My Pack</div>
           <div>
             2.支持秒传链接(PikPak://PikPak
             Tutorial.mp4|19682618|123)秒传链接默认保存到当前文件夹或第一个文件夹不能保存到根目录
@@ -270,7 +270,6 @@ import {
   SwitchHorizontal,
   ZoomQuestion,
 } from '@vicons/tabler';
-import axios from 'axios';
 import ClipboardJS from 'clipboard';
 import {
   DataTableColumns,
@@ -325,7 +324,7 @@ interface FileInfo {
 const themeVars = useThemeVars();
 const checkedRowKeys = ref<string[]>([]);
 const dialog = useDialog();
-const smallColums = ref<DataTableColumns>([
+const smallColumns = ref<DataTableColumns>([
   {
     title: '修改时间',
     key: 'modified_time',
@@ -341,6 +340,625 @@ const smallColums = ref<DataTableColumns>([
     width: 160,
   },
 ]);
+
+const loading = ref(false);
+const pageToken = ref();
+const getFileList = () => {
+  loading.value = true;
+  let filters: any = {
+    phase: { eq: 'PHASE_TYPE_COMPLETE' },
+    trashed: { eq: false },
+    // "created_time"
+    // "modified_time"
+    // "kind":{"eq":"drive#folder"},
+    // "mime_type":{"prefix":"video/"},
+  };
+  if (route.name != 'list') {
+    filters.mime_type = { prefix: String(route.name) + '/' };
+  }
+  let parent_id = route.name !== 'list' ? '*' : route.params.id;
+  http
+    .get('https://api-drive.mypikpak.com/drive/v1/files', {
+      params: {
+        parent_id: parent_id,
+        thumbnail_size: 'SIZE_LARGE',
+        with_audit: true,
+        page_token: pageToken.value || undefined,
+        limit: 100,
+        filters: filters,
+      },
+    })
+    .then((res: any) => {
+      const { data } = res;
+      if (!pageToken.value) {
+        filesList.value = [];
+      }
+      filesList.value = filesList.value.concat(data.files);
+      pageToken.value = data.next_page_token;
+    })
+    .finally(() => {
+      loading.value = false;
+    });
+};
+
+const aria2Data = ref();
+const parentInfo = ref();
+const smallPage = ref(true);
+
+const fileInfo = ref();
+const getFile = (id: string) => {
+  return http
+    .get('https://api-drive.mypikpak.com/drive/v1/files/' + id, {
+      params: {
+        _magic: '2021',
+        thumbnail_size: 'SIZE_LARGE',
+      },
+    })
+    .then((res) => {
+      return res;
+    });
+};
+const showVideo = ref(false);
+const showImage = ref(false);
+const showAddUrl = ref(false);
+const showCopy = ref(false);
+const newUrl = ref();
+const taskRef = ref();
+const firstFolder = computed(() => {
+  let id = '';
+  if (route.params.id) {
+    id = String(route.params.id);
+  } else {
+    for (let i in filesList.value) {
+      if (filesList.value[i].kind === 'drive#folder') {
+        id = filesList.value[i].id;
+        break;
+      }
+    }
+  }
+  return id;
+});
+const addUrl = () => {
+  const urlList = newUrl.value.split('\n');
+  let successLength = 0;
+  let hasTask = false;
+  let hasHash = false;
+  urlList.forEach((url: string) => {
+    if (url) {
+      let postData = {};
+      if (url.indexOf('PikPak://') === 0) {
+        const urlData = url.substring(9).split('|');
+        hasHash = true;
+        postData = {
+          kind: 'drive#file',
+          parent_id: firstFolder.value,
+          name: urlData[0],
+          size: urlData[1],
+          hash: urlData[2],
+          upload_type: 'UPLOAD_TYPE_RESUMABLE',
+          objProvider: {
+            provider: 'UPLOAD_TYPE_UNKNOWN',
+          },
+        };
+      } else if (url.indexOf(':') !== -1) {
+        hasTask = true;
+        postData = {
+          kind: 'drive#file',
+          name: '',
+          parent_id: route.params.id || '',
+          upload_type: 'UPLOAD_TYPE_URL',
+          url: {
+            url: url,
+          },
+          params: { from: 'file' },
+          folder_type: 'DOWNLOAD',
+        };
+      } else {
+        hasHash = true;
+        postData = {
+          kind: 'drive#folder',
+          parent_id: route.params.id || '',
+          name: url,
+        };
+      }
+      showAddUrl.value = false;
+      http
+        .post('https://api-drive.mypikpak.com/drive/v1/files', postData)
+        .then((res: any) => {
+          if (res.data.upload_type === 'UPLOAD_TYPE_UNKNOWN' || url.indexOf('PikPak://') === -1) {
+            window.$message.success('添加成功');
+          }
+        })
+        .finally(() => {
+          successLength++;
+          if (successLength === urlList.length) {
+            newUrl.value = '';
+            if (hasTask) {
+              taskRef.value.getTask();
+            }
+            if (hasHash) {
+              pageToken.value = '';
+              getFileList();
+            }
+          }
+        });
+    } else {
+      successLength++;
+    }
+  });
+};
+const deleteFile = (id: string | string[]) => {
+  http
+    .post('https://api-drive.mypikpak.com/drive/v1/files:batchTrash', {
+      ids: typeof id === 'string' ? [id] : id,
+    })
+    .then(() => {
+      window.$message.success('删除成功');
+      pageToken.value = '';
+      if (typeof id === 'object') {
+        checkedRowKeys.value = [];
+      }
+      getFileList();
+    });
+};
+const showCopyFail = ref(false);
+const copyValue = ref('');
+const notification = useNotification();
+const allLoading = ref(false);
+const nRef = ref<NotificationReactive>();
+const copy = (value: string) => {
+  nextTick(() => {
+    const fakeElement = document.createElement('button');
+    const clipboard = new ClipboardJS(fakeElement, {
+      text: () => value,
+      action: () => 'copy',
+    });
+    clipboard.on('success', (e) => {
+      window.$message.success('复制成功');
+      clipboard.destroy();
+    });
+    clipboard.on('error', (e) => {
+      window.$message.error('复制失败，您可以F12打开控制台手动复制，或手动复制弹窗输入框');
+      showCopyFail.value = true;
+      copyValue.value = value;
+      console.log(e.text);
+      clipboard.destroy();
+    });
+    fakeElement.click();
+  });
+};
+const downFile = (id: string) => {
+  getFile(id).then((info: any) => {
+    streamSaver.mitm = 'mitm.html';
+    const fileStream = streamSaver.createWriteStream(info.data.name);
+    fetch(info.data.web_content_link).then((res: any) => {
+      if (!window.$downId) {
+        window.$downId = [];
+      }
+      window.$downId.push(id);
+      const readableStream = res.body;
+      // more optimized
+      if (window.WritableStream && readableStream?.pipeTo) {
+        return readableStream.pipeTo(fileStream).then(() => {
+          window.$downId.splice(window.$downId.indexOf(id), 1);
+        });
+      }
+
+      const writer = fileStream.getWriter();
+
+      const reader = res.body.getReader();
+      const pump = () =>
+        reader.read().then((res: any) => {
+          if (res.done) {
+            writer.close();
+          } else {
+            writer.write(res.value).then(pump);
+          }
+        });
+
+      pump();
+    });
+  });
+};
+const aria2Dir = ref();
+const getAria2Dir = () => {
+  let postData: any = {
+    id: '',
+    jsonrpc: '2.0',
+    method: 'aria2.getGlobalOption',
+    params: [],
+  };
+  if (aria2Data.value.token) {
+    postData.params.splice(0, 0, 'token:' + aria2Data.value.token);
+  }
+  fetch(aria2Data.value.host, {
+    method: 'POST',
+    body: JSON.stringify(postData),
+    headers: new Headers({
+      'Content-Type': 'application/json',
+    }),
+  })
+    .then((response) => response.json())
+    .then((res) => {
+      aria2Dir.value = res?.result?.dir || '';
+    });
+};
+const aria2Post = (res: any, dir?: string) => {
+  let url = res.data.web_content_link;
+  //    if(res.data.medias && res.data.medias.length) {
+  //      url = res.data.medias[0]?.link?.url || url
+  //    }
+  let postData: any = {
+    id: '',
+    jsonrpc: '2.0',
+    method: 'aria2.addUri',
+    params: [
+      [url],
+      {
+        out: res.data.name,
+      },
+    ],
+  };
+  if (dir && aria2Dir.value) {
+    postData.params[1].dir = aria2Dir.value + '/' + dir;
+  }
+  if (aria2Data.value.token) {
+    postData.params.splice(0, 0, 'token:' + aria2Data.value.token);
+  }
+  fetch(aria2Data.value.host, {
+    method: 'POST',
+    body: JSON.stringify(postData),
+    headers: new Headers({
+      'Content-Type': 'application/json',
+    }),
+  })
+    .then((response) => response.json())
+    .then((res) => {
+      if (res.error && res.error.message) {
+        window.$message.error(res.error.message);
+      } else if (res.result) {
+        window.$message.success('推送成功');
+      }
+    })
+    .catch((error) => console.error('Error:', error));
+};
+const scrollHandle = (e: any) => {
+  if (e.target.offsetHeight + e.target.scrollTop >= e.target.scrollHeight - 30) {
+    if (pageToken.value && !loading.value) {
+      getFileList();
+    }
+  }
+};
+const moveFiles = ref();
+const copyFiles = ref();
+const batchMove = (items: object) => {
+  moveFiles.value = items;
+  window.localStorage.setItem('pikpakMoveFiles', JSON.stringify(items));
+  window.$message.success('剪切成功，请点击页面右上方粘贴按钮');
+};
+const batchCopy = (items: object) => {
+  copyFiles.value = items;
+  window.localStorage.setItem('pikpakCopyFiles', JSON.stringify(items));
+  window.$message.success('复制成功，请点击页面右上方粘贴按钮');
+};
+const batchMoveAll = (items: object) => {
+  let text: string[] = [];
+  filesList.value.forEach((item: FileInfo) => {
+    if (checkedRowKeys.value.indexOf(item.id) !== -1) {
+      text.push(item.id);
+    }
+  });
+  batchMove(text);
+  checkedRowKeys.value = [];
+};
+const batchCopyAll = (items: object) => {
+  let text: string[] = [];
+  filesList.value.forEach((item: FileInfo) => {
+    if (checkedRowKeys.value.indexOf(item.id) !== -1) {
+      text.push(item.id);
+    }
+  });
+  batchCopy(text);
+  checkedRowKeys.value = [];
+};
+const movePost = () => {
+  http
+    .post('https://api-drive.mypikpak.com/drive/v1/files:batchMove', {
+      to: {
+        parent_id: route.params.id || '',
+      },
+      ids: moveFiles.value,
+    })
+    .then((res) => {
+      pageToken.value = '';
+      getFileList();
+      window.$message.success('剪切成功');
+      moveFiles.value = [];
+      window.localStorage.removeItem('pikpakMoveFiles');
+    });
+};
+const copyPost = () => {
+  http
+    .post('https://api-drive.mypikpak.com/drive/v1/files:batchCopy', {
+      to: {
+        parent_id: route.params.id || '',
+      },
+      ids: copyFiles.value,
+    })
+    .then((res) => {
+      pageToken.value = '';
+      getFileList();
+      window.$message.success('复制成功');
+      copyFiles.value = [];
+      window.localStorage.removeItem('pikpakCopyFiles');
+    });
+};
+const showName = ref(false);
+const newName = ref<{
+  id: string;
+  value: string;
+} | null>();
+const nameModelSHow = (row: any) => {
+  newName.value = {
+    id: row.id,
+    value: row.name,
+  };
+  showName.value = true;
+};
+const namePost = () => {
+  http
+    .patch('https://api-drive.mypikpak.com/drive/v1/files/' + newName.value?.id, {
+      name: newName.value?.value,
+    })
+    .then(() => {
+      getFileList();
+      window.$message.success('修改成功');
+      newName.value = null;
+      showName.value = false;
+    });
+};
+const downFileList = ref<{ [key: string]: any }[]>([]);
+const getFolderFile = async (id?: string, page?: string, parent?: string) => {
+  const res: any = await http.get('https://api-drive.mypikpak.com/drive/v1/files', {
+    params: {
+      parent_id: id || undefined,
+      thumbnail_size: 'SIZE_LARGE',
+      with_audit: true,
+      page_token: page || undefined,
+      filters: {
+        phase: { eq: 'PHASE_TYPE_COMPLETE' },
+        trashed: { eq: false },
+      },
+    },
+  });
+  const { files, next_page_token } = res.data;
+  if (next_page_token) {
+    await getFolderFile(id, next_page_token, parent);
+  }
+  for (let i in files) {
+    const item = files[i];
+    if (item.kind === 'drive#folder') {
+      await getFolderFile(item.id, '', (parent ? parent + '/' : '') + item.name);
+    } else {
+      downFileList.value.push({
+        name: item.name,
+        id: item.id,
+        parent: parent || '',
+        size: item.size,
+        hash: item.hash,
+      });
+    }
+  }
+  return 1;
+};
+const getAllFile = async (title?: string) => {
+  downFileList.value = [];
+  allLoading.value = true;
+  nRef.value = notification.create({
+    title: title || '推送到Aria2',
+    closable: false,
+    content: '正在获取全部文件列表',
+  });
+  const checkedRowKeysCopy = JSON.parse(JSON.stringify(checkedRowKeys.value));
+  checkedRowKeys.value = [];
+  for (let i in filesList.value) {
+    const item = filesList.value[i];
+    if (checkedRowKeysCopy.indexOf(item.id) !== -1) {
+      if (item.kind === 'drive#file') {
+        downFileList.value.push({
+          id: item.id,
+          name: item.name,
+          parent: '',
+          size: item.size,
+          hash: item.hash,
+        });
+      } else {
+        await getFolderFile(item.id, '', item.name);
+      }
+    }
+  }
+  nRef.value.content = '共获取到' + downFileList.value.length + '个文件';
+};
+const aria2All = async () => {
+  if (allLoading.value) {
+    return false;
+  }
+  await getAllFile();
+  if (!aria2Dir.value && aria2Data.value.dir) {
+    await getAria2Dir();
+  }
+  const postOne = () => {
+    getFile(downFileList.value[0].id).then(async (res) => {
+      const data: any = downFileList.value.shift();
+      await aria2Post(res, data.parent);
+      if (nRef.value?.content) {
+        nRef.value.content =
+          nRef.value?.content + '\r\n' + '推送' + data.parent + '/' + data.name + '成功';
+      }
+      if (downFileList.value.length) {
+        setTimeout(() => {
+          postOne();
+        }, 3000);
+      } else {
+        setTimeout(() => {
+          nRef.value?.destroy();
+          allLoading.value = false;
+        }, 1000);
+      }
+    });
+  };
+  postOne();
+};
+const copyAll = async () => {
+  let text = '';
+  if (allLoading.value) {
+    return false;
+  }
+  await getAllFile('分享秒传');
+  for (let i in downFileList.value) {
+    const item = downFileList.value[i];
+    if (nRef.value) {
+      nRef.value.content =
+        nRef.value.content + '\r\n' + '获取' + item.parent + '/' + item.name + '成功';
+    }
+    text = text + `PikPak://${item.name}|${item.size}|${item.hash}` + '\n';
+  }
+  copy(text);
+  setTimeout(() => {
+    allLoading.value = false;
+    nRef.value?.destroy();
+  }, 1000);
+};
+const menuTypeList = ref([
+  {
+    label: '链接',
+    value: 'a',
+  },
+  {
+    label: '复制',
+    value: 'copy',
+  },
+]);
+const menuTextList = ref({
+  web_content_link: '链接',
+  name: '名称',
+  size: '大小',
+  hash: '文件HASH值',
+});
+const newMenu = ref<{
+  type: string;
+  content: string;
+  name: string;
+}>({
+  type: 'a',
+  content: '',
+  name: '',
+});
+const showUserMenu = ref(false);
+const userMenu = ref<(typeof newMenu.value)[]>([]);
+const addUserMenu = () => {
+  userMenu.value.push(JSON.parse(JSON.stringify(newMenu.value)));
+  newMenu.value = {
+    type: 'a',
+    content: '',
+    name: '',
+  };
+  window.localStorage.setItem('pikpakUserMenu', JSON.stringify(userMenu.value));
+};
+const removeUserMenu = (key: number) => {
+  userMenu.value.splice(key, 1);
+  window.localStorage.setItem('pikpakUserMenu', JSON.stringify(userMenu.value));
+};
+const getFileActions = (row: any) => {
+  const options: DropdownMixedOption[] = [
+    {
+      label: '重命名',
+      key: 'name',
+    },
+    {
+      label: '复制',
+      key: 'batchCopy',
+    },
+    {
+      label: '剪切',
+      key: 'batchMove',
+    },
+    {
+      label: '直接下载',
+      key: 'down',
+      disabled: row.size <= 0,
+    },
+    {
+      label: '复制下载链接',
+      key: 'copyDown',
+      disabled: row.size <= 0,
+    },
+    {
+      label: '推送到Aria2',
+      key: 'aria2Post',
+      disabled: row.size <= 0 || !aria2Data.value || !aria2Data.value.host,
+    },
+    {
+      label: '复制秒传',
+      key: 'code',
+      disabled: !row.hash,
+    },
+    {
+      label: '设为默认目录',
+      key: 'base',
+      disabled: row.kind !== 'drive#folder',
+    },
+    {
+      label: '删除',
+      key: 'delete',
+    },
+    {
+      label: '直接分享',
+      key: 'sharePikPak',
+      disabled: row.kind === 'drive#folder',
+    },
+  ];
+  if (row.kind !== 'drive#folder') {
+    if (userMenu.value.length) {
+      options.push({
+        type: 'divider',
+        key: 'd1',
+      });
+      userMenu.value.forEach((item, key) => {
+        options.push({
+          label: item.name,
+          key: 'user-' + key,
+        });
+      });
+    }
+  }
+  return options;
+};
+const showSharePikPak = ref(false);
+const sharePikpak = ref();
+const sharePikPakPassword = ref();
+const sharePikPakUrl = ref();
+
+const initPage = () => {
+  moveFiles.value = JSON.parse(window.localStorage.getItem('pikpakMoveFiles') || '[]');
+  copyFiles.value = JSON.parse(window.localStorage.getItem('pikpakCopyFiles') || '[]');
+  userMenu.value = JSON.parse(window.localStorage.getItem('pikpakUserMenu') || '[]');
+  filesList.value = [];
+  checkedRowKeys.value = [];
+  pageToken.value = '';
+  getFileList();
+  parentInfo.value = {};
+  if (route.params.id && route.params.id !== '*') {
+    getFile(String(route.params.id)).then((res) => {
+      parentInfo.value = res.data;
+    });
+  }
+};
+
+watch(route, () => {
+  initPage();
+});
+
 const columns = ref<DataTableColumns>([
   {
     type: 'selection',
@@ -426,7 +1044,7 @@ const columns = ref<DataTableColumns>([
         },
         {
           default: () => [
-            !samllPage.value &&
+            !smallPage.value &&
               h(
                 NText,
                 {
@@ -437,7 +1055,7 @@ const columns = ref<DataTableColumns>([
                   default: () => '重命名',
                 },
               ),
-            !samllPage.value &&
+            !smallPage.value &&
               h(
                 NText,
                 {
@@ -448,7 +1066,7 @@ const columns = ref<DataTableColumns>([
                   default: () => '复制',
                 },
               ),
-            !samllPage.value &&
+            !smallPage.value &&
               h(
                 NText,
                 {
@@ -459,7 +1077,7 @@ const columns = ref<DataTableColumns>([
                   default: () => '剪贴',
                 },
               ),
-            !samllPage.value &&
+            !smallPage.value &&
               row.kind === 'drive#file' &&
               h(
                 NText,
@@ -471,7 +1089,7 @@ const columns = ref<DataTableColumns>([
                   default: () => '下载',
                 },
               ),
-            !samllPage.value &&
+            !smallPage.value &&
               h(
                 NText,
                 {
@@ -596,71 +1214,12 @@ const columns = ref<DataTableColumns>([
       ),
   },
 ]);
-const loading = ref(false);
-const pageToken = ref();
-const getFileList = () => {
-  loading.value = true;
-  let filters: any = {
-    phase: { eq: 'PHASE_TYPE_COMPLETE' },
-    trashed: { eq: false },
-    // "created_time"
-    // "modified_time"
-    // "kind":{"eq":"drive#folder"},
-    // "mime_type":{"prefix":"video/"},
-  };
-  if (route.name != 'list') {
-    filters.mime_type = { prefix: String(route.name) + '/' };
-  }
-  let parent_id = route.name !== 'list' ? '*' : route.params.id;
-  http
-    .get('https://api-drive.mypikpak.com/drive/v1/files', {
-      params: {
-        parent_id: parent_id,
-        thumbnail_size: 'SIZE_LARGE',
-        with_audit: true,
-        page_token: pageToken.value || undefined,
-        limit: 100,
-        filters: filters,
-      },
-    })
-    .then((res: any) => {
-      const { data } = res;
-      if (!pageToken.value) {
-        filesList.value = [];
-      }
-      filesList.value = filesList.value.concat(data.files);
-      pageToken.value = data.next_page_token;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-};
-const initPage = () => {
-  moveFiles.value = JSON.parse(window.localStorage.getItem('pikpakMoveFiles') || '[]');
-  copyFiles.value = JSON.parse(window.localStorage.getItem('pikpakCopyFiles') || '[]');
-  userMenu.value = JSON.parse(window.localStorage.getItem('pikpakUserMenu') || '[]');
-  filesList.value = [];
-  checkedRowKeys.value = [];
-  pageToken.value = '';
-  getFileList();
-  parentInfo.value = {};
-  if (route.params.id && route.params.id !== '*') {
-    getFile(String(route.params.id)).then((res) => {
-      parentInfo.value = res.data;
-    });
-  }
-};
-watch(route, () => {
-  initPage();
-});
-const aria2Data = ref();
-const parentInfo = ref();
-const samllPage = ref(true);
+
 onMounted(() => {
   const width = document.body.clientWidth;
   if (width > 968) {
-    samllPage.value = false;
-    columns.value.splice(2, 0, ...smallColums.value);
+    smallPage.value = false;
+    columns.value.splice(2, 0, ...smallColumns.value);
     columns.value[columns.value.length - 1].width = 300;
   }
   let aria2 = JSON.parse(window.localStorage.getItem('pikpakAria2') || '{}');
@@ -686,617 +1245,6 @@ onMounted(() => {
     return '还有待下载文件?';
   };
 });
-const fileInfo = ref();
-const getFile = (id: string) => {
-  return http
-    .get('https://api-drive.mypikpak.com/drive/v1/files/' + id, {
-      params: {
-        _magic: '2021',
-        thumbnail_size: 'SIZE_LARGE',
-      },
-    })
-    .then((res) => {
-      return res;
-    });
-};
-const showVideo = ref(false);
-const showImage = ref(false);
-const showAddUrl = ref(false);
-const showCopy = ref(false);
-const newUrl = ref();
-const taskRef = ref();
-const firstFolder = computed(() => {
-  let id = '';
-  if (route.params.id) {
-    id = String(route.params.id);
-  } else {
-    for (let i in filesList.value) {
-      if (filesList.value[i].kind === 'drive#folder') {
-        id = filesList.value[i].id;
-        break;
-      }
-    }
-  }
-  return id;
-});
-const addUrl = () => {
-  const urlList = newUrl.value.split('\n');
-  let successLength = 0;
-  let hasTask = false;
-  let hasHash = false;
-  urlList.forEach((url: string) => {
-    if (url) {
-      let postData = {};
-      if (url.indexOf('PikPak://') === 0) {
-        const urlData = url.substring(9).split('|');
-        hasHash = true;
-        postData = {
-          kind: 'drive#file',
-          parent_id: firstFolder.value,
-          name: urlData[0],
-          size: urlData[1],
-          hash: urlData[2],
-          upload_type: 'UPLOAD_TYPE_RESUMABLE',
-          objProvider: {
-            provider: 'UPLOAD_TYPE_UNKNOWN',
-          },
-        };
-      } else if (url.indexOf(':') !== -1) {
-        hasTask = true;
-        postData = {
-          kind: 'drive#file',
-          name: '',
-          parent_id: route.params.id || '',
-          upload_type: 'UPLOAD_TYPE_URL',
-          url: {
-            url: url,
-          },
-          params: { from: 'file' },
-          folder_type: 'DOWNLOAD',
-        };
-      } else {
-        hasHash = true;
-        postData = {
-          kind: 'drive#folder',
-          parent_id: route.params.id || '',
-          name: url,
-        };
-      }
-      showAddUrl.value = false;
-      http
-        .post('https://api-drive.mypikpak.com/drive/v1/files', postData)
-        .then((res: any) => {
-          if (res.data.upload_type === 'UPLOAD_TYPE_UNKNOWN' || url.indexOf('PikPak://') === -1) {
-            window.$message.success('添加成功');
-          }
-        })
-        .finally(() => {
-          successLength++;
-          if (successLength === urlList.length) {
-            newUrl.value = '';
-            if (hasTask) {
-              taskRef.value.getTask();
-            }
-            if (hasHash) {
-              pageToken.value = '';
-              getFileList();
-            }
-          }
-        });
-    } else {
-      successLength++;
-    }
-  });
-};
-const deleteFile = (id: string | string[]) => {
-  http
-    .post('https://api-drive.mypikpak.com/drive/v1/files:batchTrash', {
-      ids: typeof id === 'string' ? [id] : id,
-    })
-    .then(() => {
-      window.$message.success('删除成功');
-      pageToken.value = '';
-      if (typeof id === 'object') {
-        checkedRowKeys.value = [];
-      }
-      getFileList();
-    });
-};
-const showCopyFail = ref(false);
-const copyValue = ref('');
-const copy = (value: string) => {
-  nextTick(() => {
-    const fakeElement = document.createElement('button');
-    const clipboard = new ClipboardJS(fakeElement, {
-      text: () => value,
-      action: () => 'copy',
-    });
-    clipboard.on('success', (e) => {
-      window.$message.success('复制成功');
-      clipboard.destroy();
-    });
-    clipboard.on('error', (e) => {
-      window.$message.error('复制失败，您可以F12打开控制台手动复制，或手动复制弹窗输入框');
-      showCopyFail.value = true;
-      copyValue.value = value;
-      console.log(e.text);
-      clipboard.destroy();
-    });
-    fakeElement.click();
-  });
-};
-const copyAll = async () => {
-  let text = '';
-  if (allLoding.value) {
-    return false;
-  }
-  await getAllFile('分享秒传');
-  for (let i in downFileList.value) {
-    const item = downFileList.value[i];
-    if (nRef.value) {
-      nRef.value.content =
-        nRef.value.content + '\r\n' + '获取' + item.parent + '/' + item.name + '成功';
-    }
-    text = text + `PikPak://${item.name}|${item.size}|${item.hash}` + '\n';
-  }
-  copy(text);
-  setTimeout(() => {
-    allLoding.value = false;
-    nRef.value?.destroy();
-  }, 1000);
-};
-const notification = useNotification();
-const allLoding = ref(false);
-const nRef = ref<NotificationReactive>();
-const getAllFile = async (title?: string) => {
-  downFileList.value = [];
-  allLoding.value = true;
-  nRef.value = notification.create({
-    title: title || '推送到Aria2',
-    closable: false,
-    content: '正在获取全部文件列表',
-  });
-  const checkedRowKeysCopy = JSON.parse(JSON.stringify(checkedRowKeys.value));
-  checkedRowKeys.value = [];
-  for (let i in filesList.value) {
-    const item = filesList.value[i];
-    if (checkedRowKeysCopy.indexOf(item.id) !== -1) {
-      if (item.kind === 'drive#file') {
-        downFileList.value.push({
-          id: item.id,
-          name: item.name,
-          parent: '',
-          size: item.size,
-          hash: item.hash,
-        });
-      } else {
-        await getFloderFile(item.id, '', item.name);
-      }
-    }
-  }
-  nRef.value.content = '共获取到' + downFileList.value.length + '个文件';
-};
-const aria2All = async () => {
-  if (allLoding.value) {
-    return false;
-  }
-  await getAllFile();
-  if (!aria2Dir.value && aria2Data.value.dir) {
-    await getAria2Dir();
-  }
-  const postOne = () => {
-    getFile(downFileList.value[0].id).then(async (res) => {
-      const data: any = downFileList.value.shift();
-      await aria2Post(res, data.parent);
-      if (nRef.value?.content) {
-        nRef.value.content =
-          nRef.value?.content + '\r\n' + '推送' + data.parent + '/' + data.name + '成功';
-      }
-      if (downFileList.value.length) {
-        setTimeout(() => {
-          postOne();
-        }, 3000);
-      } else {
-        setTimeout(() => {
-          nRef.value?.destroy();
-          allLoding.value = false;
-        }, 1000);
-      }
-    });
-  };
-  postOne();
-};
-const downFile = (id: string) => {
-  getFile(id).then((info: any) => {
-    streamSaver.mitm = 'mitm.html';
-    const fileStream = streamSaver.createWriteStream(info.data.name);
-    fetch(info.data.web_content_link).then((res: any) => {
-      if (!window.$downId) {
-        window.$downId = [];
-      }
-      window.$downId.push(id);
-      const readableStream = res.body;
-      // more optimized
-      if (window.WritableStream && readableStream?.pipeTo) {
-        return readableStream.pipeTo(fileStream).then(() => {
-          window.$downId.splice(window.$downId.indexOf(id), 1);
-        });
-      }
-
-      const writer = fileStream.getWriter();
-
-      const reader = res.body.getReader();
-      const pump = () =>
-        reader.read().then((res: any) => {
-          if (res.done) {
-            writer.close();
-          } else {
-            writer.write(res.value).then(pump);
-          }
-        });
-
-      pump();
-    });
-  });
-};
-const aria2Dir = ref();
-const getAria2Dir = () => {
-  let postData: any = {
-    id: '',
-    jsonrpc: '2.0',
-    method: 'aria2.getGlobalOption',
-    params: [],
-  };
-  if (aria2Data.value.token) {
-    postData.params.splice(0, 0, 'token:' + aria2Data.value.token);
-  }
-  fetch(aria2Data.value.host, {
-    method: 'POST',
-    body: JSON.stringify(postData),
-    headers: new Headers({
-      'Content-Type': 'application/json',
-    }),
-  })
-    .then((response) => response.json())
-    .then((res) => {
-      aria2Dir.value = res?.result?.dir || '';
-    });
-};
-const aria2Post = (res: any, dir?: string) => {
-  let url = res.data.web_content_link;
-  //    if(res.data.medias && res.data.medias.length) {
-  //      url = res.data.medias[0]?.link?.url || url
-  //    }
-  let postData: any = {
-    id: '',
-    jsonrpc: '2.0',
-    method: 'aria2.addUri',
-    params: [
-      [url],
-      {
-        out: res.data.name,
-      },
-    ],
-  };
-  if (dir && aria2Dir.value) {
-    postData.params[1].dir = aria2Dir.value + '/' + dir;
-  }
-  if (aria2Data.value.token) {
-    postData.params.splice(0, 0, 'token:' + aria2Data.value.token);
-  }
-  fetch(aria2Data.value.host, {
-    method: 'POST',
-    body: JSON.stringify(postData),
-    headers: new Headers({
-      'Content-Type': 'application/json',
-    }),
-  })
-    .then((response) => response.json())
-    .then((res) => {
-      if (res.error && res.error.message) {
-        window.$message.error(res.error.message);
-      } else if (res.result) {
-        window.$message.success('推送成功');
-      }
-    })
-    .catch((error) => console.error('Error:', error));
-};
-const scrollHandle = (e: any) => {
-  if (e.target.offsetHeight + e.target.scrollTop >= e.target.scrollHeight - 30) {
-    if (pageToken.value && !loading.value) {
-      getFileList();
-    }
-  }
-};
-
-const batchMoveAll = (items: object) => {
-  let text: string[] = [];
-  filesList.value.forEach((item: FileInfo) => {
-    if (checkedRowKeys.value.indexOf(item.id) !== -1) {
-      text.push(item.id);
-    }
-  });
-  batchMove(text);
-  checkedRowKeys.value = [];
-};
-const batchCopyAll = (items: object) => {
-  let text: string[] = [];
-  filesList.value.forEach((item: FileInfo) => {
-    if (checkedRowKeys.value.indexOf(item.id) !== -1) {
-      text.push(item.id);
-    }
-  });
-  batchCopy(text);
-  checkedRowKeys.value = [];
-};
-const moveFiles = ref();
-const batchMove = (items: object) => {
-  moveFiles.value = items;
-  window.localStorage.setItem('pikpakMoveFiles', JSON.stringify(items));
-  window.$message.success('剪切成功，请点击页面右上方粘贴按钮');
-};
-const copyFiles = ref();
-const batchCopy = (items: object) => {
-  copyFiles.value = items;
-  window.localStorage.setItem('pikpakCopyFiles', JSON.stringify(items));
-  window.$message.success('复制成功，请点击页面右上方粘贴按钮');
-};
-const movePost = () => {
-  http
-    .post('https://api-drive.mypikpak.com/drive/v1/files:batchMove', {
-      to: {
-        parent_id: route.params.id || '',
-      },
-      ids: moveFiles.value,
-    })
-    .then((res) => {
-      pageToken.value = '';
-      getFileList();
-      window.$message.success('剪切成功');
-      moveFiles.value = [];
-      window.localStorage.removeItem('pikpakMoveFiles');
-    });
-};
-const copyPost = () => {
-  http
-    .post('https://api-drive.mypikpak.com/drive/v1/files:batchCopy', {
-      to: {
-        parent_id: route.params.id || '',
-      },
-      ids: copyFiles.value,
-    })
-    .then((res) => {
-      pageToken.value = '';
-      getFileList();
-      window.$message.success('复制成功');
-      copyFiles.value = [];
-      window.localStorage.removeItem('pikpakCopyFiles');
-    });
-};
-const nameModelSHow = (row: any) => {
-  newName.value = {
-    id: row.id,
-    value: row.name,
-  };
-  showName.value = true;
-};
-const showName = ref(false);
-const newName = ref<{
-  id: string;
-  value: string;
-} | null>();
-const namePost = () => {
-  http
-    .patch('https://api-drive.mypikpak.com/drive/v1/files/' + newName.value?.id, {
-      name: newName.value?.value,
-    })
-    .then(() => {
-      getFileList();
-      window.$message.success('修改成功');
-      newName.value = null;
-      showName.value = false;
-    });
-};
-const downFileList = ref<{ [key: string]: any }[]>([]);
-const getFloderFile = async (id?: string, page?: string, parent?: string) => {
-  const res: any = await http.get('https://api-drive.mypikpak.com/drive/v1/files', {
-    params: {
-      parent_id: id || undefined,
-      thumbnail_size: 'SIZE_LARGE',
-      with_audit: true,
-      page_token: page || undefined,
-      filters: {
-        phase: { eq: 'PHASE_TYPE_COMPLETE' },
-        trashed: { eq: false },
-      },
-    },
-  });
-  const { files, next_page_token } = res.data;
-  if (next_page_token) {
-    await getFloderFile(id, next_page_token, parent);
-  }
-  for (let i in files) {
-    const item = files[i];
-    if (item.kind === 'drive#folder') {
-      await getFloderFile(item.id, '', (parent ? parent + '/' : '') + item.name);
-    } else {
-      downFileList.value.push({
-        name: item.name,
-        id: item.id,
-        parent: parent || '',
-        size: item.size,
-        hash: item.hash,
-      });
-    }
-  }
-  return 1;
-};
-const menuTypeList = ref([
-  {
-    label: '链接',
-    value: 'a',
-  },
-  {
-    label: '复制',
-    value: 'copy',
-  },
-]);
-const menuTextList = ref({
-  web_content_link: '链接',
-  name: '名称',
-  size: '大小',
-  hash: '文件HASH值',
-});
-const newMenu = ref<{
-  type: string;
-  content: string;
-  name: string;
-}>({
-  type: 'a',
-  content: '',
-  name: '',
-});
-const showUserMenu = ref(false);
-const userMenu = ref<(typeof newMenu.value)[]>([]);
-const addUserMenu = () => {
-  userMenu.value.push(JSON.parse(JSON.stringify(newMenu.value)));
-  newMenu.value = {
-    type: 'a',
-    content: '',
-    name: '',
-  };
-  window.localStorage.setItem('pikpakUserMenu', JSON.stringify(userMenu.value));
-};
-const removeUserMenu = (key: number) => {
-  userMenu.value.splice(key, 1);
-  window.localStorage.setItem('pikpakUserMenu', JSON.stringify(userMenu.value));
-};
-const getFileActions = (row: any) => {
-  const options: DropdownMixedOption[] = [
-    {
-      label: '重命名',
-      key: 'name',
-    },
-    {
-      label: '复制',
-      key: 'batchCopy',
-    },
-    {
-      label: '剪切',
-      key: 'batchMove',
-    },
-    {
-      label: '直接下载',
-      key: 'down',
-      disabled: row.size <= 0,
-    },
-    {
-      label: '复制下载链接',
-      key: 'copyDown',
-      disabled: row.size <= 0,
-    },
-    {
-      label: '推送到Aria2',
-      key: 'aria2Post',
-      disabled: row.size <= 0 || !aria2Data.value || !aria2Data.value.host,
-    },
-    {
-      label: '复制秒传',
-      key: 'code',
-      disabled: !row.hash,
-    },
-    {
-      label: '设为默认目录',
-      key: 'base',
-      disabled: row.kind !== 'drive#folder',
-    },
-    //      {
-    //        label: '分享到资源库',
-    //        key: 'share',
-    //        disabled: !row.hash
-    //      },
-    {
-      label: '删除',
-      key: 'delete',
-    },
-    {
-      label: '直接分享',
-      key: 'sharePikPak',
-      disabled: row.kind === 'drive#folder',
-    },
-  ];
-  if (row.kind !== 'drive#folder') {
-    if (userMenu.value.length) {
-      options.push({
-        type: 'divider',
-        key: 'd1',
-      });
-      userMenu.value.forEach((item, key) => {
-        options.push({
-          label: item.name,
-          key: 'user-' + key,
-        });
-      });
-    }
-  }
-  return options;
-};
-const showSharePikPak = ref(false);
-const sharePikpak = ref();
-const sharePikPakPassword = ref();
-const sharePikPakUrl = ref();
-const sharePikPakPostLoading = ref();
-const sharePikPakPost = () => {
-  sharePikPakPostLoading.value = true;
-  getFile(sharePikpak.value.id).then((res: any) => {
-    axios
-      .post('https://pikpak-depot.z10.workers.dev', {
-        password: sharePikPakPassword.value || '',
-        uid: res.data.user_id,
-        Name: res.data.hash,
-        delete_time: String(new Date().getTime() + 24 * 60 * 60 * 1000),
-        info: {
-          name: res.data.name,
-          file_extension: res.data.file_extension,
-          hash: res.data.hash,
-          id: res.data.id,
-          md5_checksum: res.data.md5_checksum,
-          mime_type: res.data.mime_type,
-          size: res.data.size,
-          thumbnail_link: res.data.thumbnail_link,
-          web_content_link: res.data.web_content_link,
-        },
-        info2: {
-          medias: res.data.medias,
-        },
-        info3: {
-          links: res.data.links,
-        },
-      })
-      .then((res: any) => {
-        sharePikPakUrl.value =
-          window.location.origin +
-          window.location.pathname +
-          router.resolve({
-            name: 'shareInfo',
-            params: {
-              id: res.data.id,
-            },
-          }).href;
-        copy(
-          sharePikPakUrl.value +
-            (sharePikPakPassword.value ? ' 提取密码  ' + sharePikPakPassword.value : ''),
-        );
-      })
-      .catch((res) => {
-        window.$message.error(res.response.error || '出错了');
-      })
-      .finally(() => {
-        sharePikPakPostLoading.value = false;
-        showSharePikPak.value = false;
-      });
-  });
-};
 </script>
 
 <style>
@@ -1327,7 +1275,7 @@ const sharePikPakPost = () => {
   color: rgba(37, 38, 43, 0.36);
 }
 .n-data-table-td.size,
-.n-data-table-th.szie {
+.n-data-table-th.size {
   color: rgba(37, 38, 43, 0.36);
 }
 .file-info {

@@ -53,6 +53,9 @@ const columns = ref<DataTableColumns>([]);
 const list = ref();
 const loading = ref(false);
 const nextCursor = ref();
+const getUploadFolder = () => {
+  return JSON.parse(window.localStorage.getItem('pikpakUploadFolder') || '{}');
+};
 const addUrl = (url: string) => {
   let postData = {};
   if (!getUploadFolder().id) {
@@ -178,10 +181,6 @@ const getList = () => {
     });
 };
 const uploadFolder = ref();
-const getUploadFolder = () => {
-  return JSON.parse(window.localStorage.getItem('pikpakUploadFolder') || '{}');
-};
-
 const scrollHandle = (e: any) => {
   if (e.target.offsetHeight - e.target.scrollTop < 30) {
     if (nextCursor.value && !loading.value) {

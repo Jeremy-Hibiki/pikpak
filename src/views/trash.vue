@@ -22,7 +22,7 @@
     </n-scrollbar>
     <div v-if="checkedRowKeys.length" class="outer-wrapper static show">
       <div class="toolbar-wrapper">
-        <div class="toolbar-item" @click="unTransh(checkedRowKeys)">
+        <div class="toolbar-item" @click="unTrash(checkedRowKeys)">
           <n-tooltip>
             <template #trigger>
               <n-icon>
@@ -32,7 +32,7 @@
             还原所选
           </n-tooltip>
         </div>
-        <div class="toolbar-item" @click="deleteTransh(checkedRowKeys)">
+        <div class="toolbar-item" @click="deleteTrash(checkedRowKeys)">
           <n-tooltip>
             <template #trigger>
               <n-icon>
@@ -70,7 +70,7 @@ import http from '../utils/axios';
 
 const filesList = ref();
 const checkedRowKeys = ref([]);
-const smallColums = ref<DataTableColumns>([
+const smallColumns = ref<DataTableColumns>([
   {
     title: '删除时间',
     key: 'modified_time',
@@ -93,6 +93,62 @@ const smallColums = ref<DataTableColumns>([
     width: 160,
   },
 ]);
+
+const loading = ref(false);
+const pageToken = ref();
+const getFileList = () => {
+  loading.value = true;
+  http
+    .get('https://api-drive.mypikpak.com/drive/v1/files', {
+      params: {
+        parent_id: '*',
+        thumbnail_size: 'SIZE_LARGE',
+        with_audit: true,
+        page_token: pageToken.value || undefined,
+        filters: {
+          phase: { eq: 'PHASE_TYPE_COMPLETE' },
+          trashed: { eq: true },
+        },
+      },
+    })
+    .then((res: any) => {
+      const { data } = res;
+      if (!pageToken.value) {
+        filesList.value = [];
+      }
+      filesList.value = filesList.value.concat(data.files);
+      pageToken.value = data.next_page_token;
+    })
+    .finally(() => {
+      loading.value = false;
+    });
+};
+const deleteTrash = (id: string | string[]) => {
+  http
+    .post('https://api-drive.mypikpak.com/drive/v1/files:batchDelete', {
+      ids: typeof id === 'string' ? [id] : id,
+    })
+    .then(() => {
+      window.$message.success('删除成功');
+      getFileList();
+    });
+};
+const unTrash = (id: string | string[]) => {
+  http
+    .post('https://api-drive.mypikpak.com/drive/v1/files:batchUntrash', {
+      ids: typeof id === 'string' ? [id] : id,
+    })
+    .then(() => {
+      getFileList();
+    });
+};
+const scrollHandle = (e: any) => {
+  if (e.target.offsetHeight - e.target.scrollTop < 30) {
+    if (pageToken.value && !loading.value) {
+      getFileList();
+    }
+  }
+};
 const columns = ref<DataTableColumns>([
   {
     type: 'selection',
@@ -147,7 +203,7 @@ const columns = ref<DataTableColumns>([
               {
                 type: 'primary',
                 onClick: () => {
-                  unTransh(String(row.id));
+                  unTrash(String(row.id));
                 },
               },
               {
@@ -159,7 +215,7 @@ const columns = ref<DataTableColumns>([
               {
                 placement: 'right',
                 onPositiveClick: () => {
-                  deleteTransh(String(row.id));
+                  deleteTrash(String(row.id));
                 },
               },
               {
@@ -182,66 +238,10 @@ const columns = ref<DataTableColumns>([
       ),
   },
 ]);
-const loading = ref(false);
-const pageToken = ref();
-const getFileList = () => {
-  loading.value = true;
-  http
-    .get('https://api-drive.mypikpak.com/drive/v1/files', {
-      params: {
-        parent_id: '*',
-        thumbnail_size: 'SIZE_LARGE',
-        with_audit: true,
-        page_token: pageToken.value || undefined,
-        filters: {
-          phase: { eq: 'PHASE_TYPE_COMPLETE' },
-          trashed: { eq: true },
-        },
-      },
-    })
-    .then((res: any) => {
-      const { data } = res;
-      if (!pageToken.value) {
-        filesList.value = [];
-      }
-      filesList.value = filesList.value.concat(data.files);
-      pageToken.value = data.next_page_token;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-};
-const deleteTransh = (id: string | string[]) => {
-  http
-    .post('https://api-drive.mypikpak.com/drive/v1/files:batchDelete', {
-      ids: typeof id === 'string' ? [id] : id,
-    })
-    .then(() => {
-      window.$message.success('删除成功');
-      getFileList();
-    });
-};
-const unTransh = (id: string | string[]) => {
-  http
-    .post('https://api-drive.mypikpak.com/drive/v1/files:batchUntrash', {
-      ids: typeof id === 'string' ? [id] : id,
-    })
-    .then(() => {
-      getFileList();
-    });
-};
-
-const scrollHandle = (e: any) => {
-  if (e.target.offsetHeight - e.target.scrollTop < 30) {
-    if (pageToken.value && !loading.value) {
-      getFileList();
-    }
-  }
-};
 onMounted(() => {
   const width = document.body.clientWidth;
   if (width > 968) {
-    columns.value.splice(2, 0, ...smallColums.value);
+    columns.value.splice(2, 0, ...smallColumns.value);
   }
   getFileList();
 });
@@ -275,7 +275,7 @@ onMounted(() => {
   color: rgba(37, 38, 43, 0.36);
 }
 .n-data-table-td.size,
-.n-data-table-th.szie {
+.n-data-table-th.size {
   color: rgba(37, 38, 43, 0.36);
 }
 .file-info {

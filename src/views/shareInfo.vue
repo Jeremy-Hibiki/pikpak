@@ -441,7 +441,7 @@ onMounted(() => {
   color: rgba(37, 38, 43, 0.36);
 }
 .n-data-table-td.size,
-.n-data-table-th.szie {
+.n-data-table-th.size {
   color: rgba(37, 38, 43, 0.36);
 }
 .file-info {

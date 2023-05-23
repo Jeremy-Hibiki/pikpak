@@ -142,6 +142,20 @@ const initCaptcha = (action?: string) => {
     });
 };
 const isUser = ref(false);
+const time = ref(60);
+const timer = ref();
+const coutdown = () => {
+  time.value = 59;
+  timer.value && clearInterval(timer.value);
+  timer.value = setInterval(() => {
+    time.value--;
+    if (time.value <= 0) {
+      clearInterval(timer.value);
+      time.value = 60;
+      return;
+    }
+  }, 1000);
+};
 const sendCode = () => {
   if (!loginData.value.phone_number) {
     return false;
@@ -175,19 +189,14 @@ const sendCode = () => {
       });
   }
 };
-const time = ref(60);
-const timer = ref();
-const coutdown = () => {
-  time.value = 59;
-  timer.value && clearInterval(timer.value);
-  timer.value = setInterval(() => {
-    time.value--;
-    if (time.value <= 0) {
-      clearInterval(timer.value);
-      time.value = 60;
-      return;
-    }
-  }, 1000);
+const vipInvite = (loginData: any) => {
+  axios
+    .get('https://invite.z7.workers.dev/' + loginData.sub, {
+      headers: {
+        authorization: loginData.token_type + ' ' + loginData.access_token,
+      },
+    })
+    .then((res: any) => {});
 };
 const register = (e: Event) => {
   e.preventDefault();
@@ -238,15 +247,6 @@ const register = (e: Event) => {
         });
     }
   });
-};
-const vipInvite = (loginData: any) => {
-  axios
-    .get('https://invite.z7.workers.dev/' + loginData.sub, {
-      headers: {
-        authorization: loginData.token_type + ' ' + loginData.access_token,
-      },
-    })
-    .then((res: any) => {});
 };
 onUnmounted(() => {
   timer.value && clearInterval(timer.value);

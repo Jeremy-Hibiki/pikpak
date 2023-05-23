@@ -6,7 +6,7 @@ addEventListener('fetch', event => {
 
   /**
   * Respond to the request
-  * @param {Request} request
+  * @param {FetchEvent} event
   */
   async function handleRequest(event) {
     const { request } = event;
