@@ -9,7 +9,7 @@ import {
   zhCN,
 } from 'naive-ui';
 import { onMounted, ref } from 'vue';
-import './components/MessageContent';
+import MessageContent from './components/MessageContent.vue';
 import { proxy } from './config';
 const themeOverrides = ref<GlobalThemeOverrides>({
   common: {
@@ -49,6 +49,7 @@ onMounted(() => {
       <n-dialog-provider>
         <n-notification-provider>
           <router-view></router-view>
+          <message-content />
         </n-notification-provider>
       </n-dialog-provider>
     </n-message-provider>
