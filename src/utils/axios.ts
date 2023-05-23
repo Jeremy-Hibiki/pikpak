@@ -81,18 +81,4 @@ instance.interceptors.response.use(
   },
 );
 
-const instance2 = axios.create({});
-instance2.interceptors.request.use((request) => {
-  request.headers.set('Authorization', 'Bearer secret_FErDcv3kgsFNLiWUDOWYdJhNqOIKj55eteBg3vIoiLt');
-  request.headers.set('Notion-Version', '2021-08-16');
-  request.headers.set('Content-Type', 'application/json');
-  const proxyArray = JSON.parse(window.localStorage.getItem('proxy') || '[]');
-  if (proxyArray.length > 0) {
-    const index = Math.floor(Math.random() * proxyArray.length);
-    request.url = proxyArray[index] + '/' + request.url;
-  }
-  return request;
-});
-
-export const notionHttp = instance2;
 export default instance;

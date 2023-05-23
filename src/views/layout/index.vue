@@ -146,11 +146,6 @@ const menuOptions = ref<MenuOption[]>([
     key: 'invited',
     icon: renderIcon(Copy),
   },
-  //    {
-  //      label: '资源库',
-  //      key: 'share',
-  //      icon: renderIcon(Share)
-  //    },
   {
     label: '设置',
     key: 'setting',
