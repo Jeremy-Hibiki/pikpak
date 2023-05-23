@@ -10,6 +10,6 @@ export const proxy = [
   'https://pikpak.yang-s.online',
   'https://pikpak.hongtonlow.ga',
   'https://pikpak.520936.xyz',
-]
+];
 
-export const version = '1.25.2'
+export const version = '1.25.2';

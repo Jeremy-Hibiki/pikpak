@@ -1,9 +1,9 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import vue from '@vitejs/plugin-vue';
+import { defineConfig } from 'vite';
 
 // https://vitejs.dev/config/
-export default defineConfig(({mode}) => {
-  console.log(mode)
+export default defineConfig(({ mode }) => {
+  console.log(mode);
   return {
     base: mode === 'development' ? '' : '/pikpak',
     plugins: [vue()],
@@ -12,8 +12,8 @@ export default defineConfig(({mode}) => {
         '/v1/pages': {
           target: 'https://api.notion.com',
           changeOrigin: true,
-        }
-      }
-    }
-  }
-})
+        },
+      },
+    },
+  };
+});

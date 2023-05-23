@@ -1,16 +1,16 @@
 addEventListener('fetch', event => {
     event.passThroughOnException()
-  
+
     event.respondWith(handleRequest(event))
   })
-  
+
   /**
   * Respond to the request
   * @param {Request} request
   */
   async function handleRequest(event) {
     const { request } = event;
-  
+
     //请求头部、返回对象
     let reqHeaders = new Headers(request.headers),
         outBody, outStatus = 200, outStatusText = 'OK', outCt = null, outHeaders = new Headers({
@@ -18,12 +18,12 @@ addEventListener('fetch', event => {
             "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": reqHeaders.get('Access-Control-Allow-Headers') || "Accept, Authorization, Cache-Control, Content-Type, DNT, If-Modified-Since, Keep-Alive, Origin, User-Agent, X-Requested-With, Token, x-access-token, Notion-Version"
         });
-  
+
     try {
         //取域名第一个斜杠后的所有信息为代理链接
         let url = request.url.substr(8);
         url = decodeURIComponent(url.substr(url.indexOf('/') + 1));
-  
+
         //需要忽略的代理
         if (request.method == "OPTIONS" && reqHeaders.has('access-control-request-headers')) {
             //输出提示
@@ -47,7 +47,7 @@ addEventListener('fetch', event => {
                 method: request.method,
                 headers: {}
             }
-  
+
             //保留头部其它信息
             let he = reqHeaders.entries();
             for (let h of he) {
@@ -105,23 +105,23 @@ addEventListener('fetch', event => {
             msg: JSON.stringify(err.stack) || err
         });
     }
-  
+
     //设置类型
     if (outCt && outCt != "") {
         outHeaders.set("content-type", outCt);
     }
-  
+
     let response = new Response(outBody, {
-        status: outStatus,
-        statusText: outStatusText,
-        headers: outHeaders
-    })
-  
+      status: outStatus,
+      statusText: outStatusText,
+      headers: outHeaders,
+    });
+
     return response;
-  
+
     // return new Response('OK', { status: 200 })
   }
-  
+
   /**
   * 阻断器
   */

@@ -1,63 +1,60 @@
 <template>
-  <div class="mobile landing-bg" v-if="isMobile && !isIos">
-    <div class="content" >
-      <header  style="font-size: 17px;">PikPak</header>
-      <div class="thumbnail" >
+  <div v-if="isMobile && !isIos" class="mobile landing-bg">
+    <div class="content">
+      <header style="font-size: 17px">PikPak</header>
+      <div class="thumbnail">
         <div
           class="thumbnail__blur"
-          
           :style="{ backgroundImage: 'url(' + fileInfo?.meta?.thumbnail_link + ')' }"
         ></div>
-        <div class="el-image" >
+        <div class="el-image">
           <img
             class="el-image__inner"
             :src="fileInfo?.meta?.thumbnail_link"
-            style="object-fit: contain;"
+            style="object-fit: contain"
           />
           <!--v-if-->
         </div>
-        <div class="info" >
-          <div class="file-icon" >
-            <div class="el-image" >
-              <img
-                class="el-image__inner"
-                :src="fileInfo?.meta?.icon"
-              />
+        <div class="info">
+          <div class="file-icon">
+            <div class="el-image">
+              <img class="el-image__inner" :src="fileInfo?.meta?.icon" />
               <!--v-if-->
             </div>
           </div>
-          <div  style="min-width: 0px;">
+          <div style="min-width: 0px">
             <div class="name">{{ fileInfo?.name }}</div>
-            <div >
+            <div>
               <span class="file-count">{{ fileInfo?.file_count }}个文件</span>
               <span class="file-size">{{ byteConvert(fileInfo.file_size) }}</span>
             </div>
           </div>
         </div>
       </div>
-      <div
-        style="margin-top: 16px; font-size: 15px; line-height: 22px; text-align: center;"
-      >当前文件保存中,请打开 PikPak App 查看</div>
-      <div class="google-play" >
-        <div >
+      <div style="margin-top: 16px; font-size: 15px; line-height: 22px; text-align: center">
+        当前文件保存中,请打开 PikPak App 查看
+      </div>
+      <div class="google-play">
+        <div>
           <div class="installed" @click="toGooglePlay('GooglePlay', route.query)"></div>
           <div class="no-installed" @click="getApk()">
-            <div class="tips1" >未安装 Google Play</div>
-            <div class="tips2" >下载安装包</div>
+            <div class="tips1">未安装 Google Play</div>
+            <div class="tips2">下载安装包</div>
           </div>
         </div>
-        <a class="open-app" @click="callApp('downloaded', route.query)"  style="cursor: pointer;">已安装PikPak，前往查看 &gt;</a>
+        <a class="open-app" style="cursor: pointer" @click="callApp('downloaded', route.query)"
+          >已安装PikPak，前往查看 &gt;</a
+        >
       </div>
-      <div class="features" >
+      <div class="features">
         <div class="item" @click="callApp('collect', route.query)">
-          <div class="icon" >
+          <div class="icon">
             <svg
               width="60"
               height="60"
               viewBox="0 0 60 60"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              
             >
               <rect width="60" height="60" rx="30" fill="white" fill-opacity="0.8" />
               <mask
@@ -66,7 +63,7 @@
                 y="0"
                 width="60"
                 height="60"
-                style="mask-type: alpha;"
+                style="mask-type: alpha"
               >
                 <rect width="60" height="60" rx="30" fill="white" />
               </mask>
@@ -94,17 +91,16 @@
               </g>
             </svg>
           </div>
-          <div class="title" >全能云下载</div>
+          <div class="title">全能云下载</div>
         </div>
         <div class="item" @click="callApp('6T', route.query)">
-          <div class="icon" >
+          <div class="icon">
             <svg
               width="72"
               height="72"
               viewBox="0 0 72 72"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              
             >
               <rect width="72" height="72" rx="36" fill="white" fill-opacity="0.8" />
               <mask
@@ -113,7 +109,7 @@
                 y="0"
                 width="72"
                 height="72"
-                style="mask-type: alpha;"
+                style="mask-type: alpha"
               >
                 <rect width="72" height="72" rx="36" fill="white" />
               </mask>
@@ -127,17 +123,16 @@
               </g>
             </svg>
           </div>
-          <div class="title" >畅享10TB云盘空间</div>
+          <div class="title">畅享10TB云盘空间</div>
         </div>
         <div class="item" @click="callApp('short_video', route.query)">
-          <div class="icon" >
+          <div class="icon">
             <svg
               width="60"
               height="60"
               viewBox="0 0 60 60"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              
             >
               <rect width="60" height="60" rx="30" fill="white" fill-opacity="0.8" />
               <mask
@@ -146,7 +141,7 @@
                 y="0"
                 width="60"
                 height="60"
-                style="mask-type: alpha;"
+                style="mask-type: alpha"
               >
                 <rect width="60" height="60" rx="30" fill="white" />
               </mask>
@@ -164,7 +159,7 @@
                   y="22"
                   width="10"
                   height="15"
-                  style="mask-type: alpha;"
+                  style="mask-type: alpha"
                 >
                   <path
                     fill-rule="evenodd"
@@ -180,23 +175,24 @@
                 <path
                   d="M27.4087 31.3533H22.5638C22.2428 31.3533 22.0526 30.9941 22.2329 30.7285L26.4552 24.5122C26.5297 24.4025 26.6536 24.3369 26.7861 24.3369H30.4687C30.7818 24.3369 30.9735 24.6806 30.809 24.947L28.5671 28.5785H32.505C32.8447 28.5785 33.0298 28.9751 32.8116 29.2354L26.4363 36.8406C26.3001 37.0031 26.0378 36.8697 26.089 36.6639L27.4087 31.3533Z"
                   fill="white"
-                />&gt;
+                />
+                &gt;
               </g>
             </svg>
           </div>
-          <div class="title" >
-            <div >极速秒存</div>
-            <div >一键播放</div>
+          <div class="title">
+            <div>极速秒存</div>
+            <div>一键播放</div>
           </div>
         </div>
       </div>
     </div>
-    <div class="footer" >
-      <a href="https://inapp.mypikpak.com/policy/privacy-policy" >隐私政策</a>&nbsp;
-      <a href="https://inapp.mypikpak.com/policy/user-agreement" >用户协议</a>&nbsp;PikPak © 2022
+    <div class="footer">
+      <a href="https://inapp.mypikpak.com/policy/privacy-policy">隐私政策</a>&nbsp;
+      <a href="https://inapp.mypikpak.com/policy/user-agreement">用户协议</a>&nbsp;PikPak © 2022
     </div>
   </div>
-  <div class="landing-bg" v-else>
+  <div v-else class="landing-bg">
     <div class="landing">
       <header class="payment-header">
         <a href="./" class>
@@ -283,7 +279,7 @@
                     y="0"
                     width="72"
                     height="72"
-                    style="mask-type: alpha;"
+                    style="mask-type: alpha"
                   >
                     <rect width="72" height="72" rx="36" fill="white" />
                   </mask>
@@ -315,7 +311,7 @@
                     y="0"
                     width="72"
                     height="72"
-                    style="mask-type: alpha;"
+                    style="mask-type: alpha"
                   >
                     <rect width="72" height="72" rx="36" fill="white" />
                   </mask>
@@ -377,7 +373,7 @@
                     y="0"
                     width="72"
                     height="72"
-                    style="mask-type: alpha;"
+                    style="mask-type: alpha"
                   >
                     <rect width="72" height="72" rx="36" fill="white" />
                   </mask>
@@ -409,7 +405,7 @@
                     y="0"
                     width="72"
                     height="72"
-                    style="mask-type: alpha;"
+                    style="mask-type: alpha"
                   >
                     <rect width="72" height="72" rx="36" fill="white" />
                   </mask>
@@ -446,7 +442,7 @@
               <img
                 class="el-image__inner"
                 :src="fileInfo?.meta?.thumbnail_link"
-                style="object-fit: contain;"
+                style="object-fit: contain"
               />
               <!--v-if-->
             </div>
@@ -457,7 +453,7 @@
                   <!--v-if-->
                 </div>
               </div>
-              <div style="min-width: 0px;">
+              <div style="min-width: 0px">
                 <div class="name">{{ fileInfo?.name }}</div>
                 <div>
                   <span class="file-count">{{ fileInfo?.file_count }}个文件</span>
@@ -481,14 +477,16 @@
 import ClipboardJS from 'clipboard';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { byteConvert } from '../utils'
-import http from '../utils/axios'
-const route = useRoute()
+import { byteConvert } from '../utils';
+import http from '../utils/axios';
+const route = useRoute();
 const addUrl = computed(() => route.query.__add_url);
-const userInfo = computed(() => JSON.parse(localStorage.getItem('pikpakUser') || '{}'))
-const isMobile = computed(() => /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
-const isIos = computed(() => /iPhone|iPod|iPad/i.test(navigator.userAgent))
-const fileInfo = ref<any>({})
+const userInfo = computed(() => JSON.parse(localStorage.getItem('pikpakUser') || '{}'));
+const isMobile = computed(() =>
+  /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+);
+const isIos = computed(() => /iPhone|iPod|iPad/i.test(navigator.userAgent));
+const fileInfo = ref<any>({});
 const composeDeepLink = (params: any) => {
   if (params.deepLink) {
     // telegram过来的链接
@@ -508,15 +506,15 @@ const composeDeepLink = (params: any) => {
     )}&from=${encodeURIComponent(from)}`;
     return deepLink;
   }
-}
-const callApp = (button: any, params: any) =>{
+};
+const callApp = (button: any, params: any) => {
   // 数据上报
   const deepLinkHost = 'pikpakapp://mypikpak.com';
   let deepLink = composeDeepLink(params);
   const hostDeepLink = deepLinkHost + deepLink;
 
   window.location.href = hostDeepLink;
-}
+};
 
 const toGooglePlay = (button: any, params: any) => {
   let deepLink = btoa(composeDeepLink(params))
@@ -524,38 +522,39 @@ const toGooglePlay = (button: any, params: any) => {
     .replace(/\//g, '_')
     .replace(/=/g, '');
   window.location.href = `http://play.google.com/store/apps/details?id=com.pikcloud.pikpak&referrer=${deepLink}`;
-}
+};
 const getFileInfo = () => {
-  http.post('https://api-drive.mypikpak.com/drive/v1/resource/list', {
-    page_size: 500,
-    thumbnail_type: 'FROM_HASH',
-    urls: addUrl.value,
-  })
-    .then((res: any) => {
-      console.log(res)
-      fileInfo.value = res.data?.list?.resources[0] || {}
+  http
+    .post('https://api-drive.mypikpak.com/drive/v1/resource/list', {
+      page_size: 500,
+      thumbnail_type: 'FROM_HASH',
+      urls: addUrl.value,
     })
-}
+    .then((res: any) => {
+      console.log(res);
+      fileInfo.value = res.data?.list?.resources[0] || {};
+    });
+};
 
-const copy = (value:string) => {
+const copy = (value: string) => {
   nextTick(() => {
-    const fakeElement = document.createElement('button')
+    const fakeElement = document.createElement('button');
     const clipboard = new ClipboardJS(fakeElement, {
       text: () => value,
       action: () => 'copy',
-    })
+    });
     clipboard.on('success', (e) => {
-      window.$message.success('复制成功')
-      clipboard.destroy()
-    })
+      window.$message.success('复制成功');
+      clipboard.destroy();
+    });
     clipboard.on('error', (e) => {
-      console.log(e.text)
-      clipboard.destroy()
-    })
-    fakeElement.click()
-  })
-}
-function matchResourceChannel () {
+      console.log(e.text);
+      clipboard.destroy();
+    });
+    fakeElement.click();
+  });
+};
+function matchResourceChannel() {
   const params = route.query as Record<string, string>;
   try {
     const channel = params.__source || params.from;
@@ -583,14 +582,16 @@ function matchResourceChannel () {
       'fz2',
       ...Array.from(Array(100), (_, idx) => 'zy' + `${idx + 1}`.padStart(4, '0')),
     ];
-    const partnerAPKMapping = partnerAPK.reduce((prev, curr) => ({
-      ...prev,
-      [curr]: `https://download.mypikpak.com/app/${curr}_PikPak.apk`,
-    }), {});
+    const partnerAPKMapping = partnerAPK.reduce(
+      (prev, curr) => ({
+        ...prev,
+        [curr]: `https://download.mypikpak.com/app/${curr}_PikPak.apk`,
+      }),
+      {} as any,
+    );
     for (let k in partnerAPKMapping) {
       const reg = RegExp(`^${k}`, 'i');
       if (reg.test(channel)) {
-        // @ts-ignore
         return partnerAPKMapping[k];
       }
     }
@@ -609,30 +610,28 @@ const getApk = () => {
   let timer: ReturnType<typeof setTimeout> = setTimeout(() => {
     document.body.removeChild(downloadBtn);
     clearTimeout(timer);
-    // @ts-ignore
     timer = 0;
   }, 3000);
-}
+};
 const saveUrl = () => {
   let postData = {
-    kind: "drive#file",
-    upload_type: "UPLOAD_TYPE_URL",
+    kind: 'drive#file',
+    upload_type: 'UPLOAD_TYPE_URL',
     url: {
       url: addUrl.value,
     },
-    folder_type: "DOWNLOAD"
-  }
-  http.post('https://api-drive.mypikpak.com/drive/v1/files', postData)
-    .then((res:any) => {
-      window.$message.success('添加成功, 请前往网盘查看')
-    })
-}
+    folder_type: 'DOWNLOAD',
+  };
+  http.post('https://api-drive.mypikpak.com/drive/v1/files', postData).then((res: any) => {
+    window.$message.success('添加成功, 请前往网盘查看');
+  });
+};
 onMounted(() => {
-  getFileInfo()
-})
+  getFileInfo();
+});
 </script>
 
-<style lang="scss" >
+<style lang="scss">
 .landing-bg {
   --color-primary: #306eff;
   --color-primary-hover: #4a80ff;
@@ -656,8 +655,7 @@ onMounted(() => {
 .landing-bg {
   width: 100%;
   min-height: var(--vh, 100vh);
-  background: url(https://drive.mypikpak.com/assets/background.e7506910.svg)
-      var(--no-repeat-center),
+  background: url(https://drive.mypikpak.com/assets/background.e7506910.svg) var(--no-repeat-center),
     rgba(209, 232, 255, 0.6);
   background-size: cover;
   .el-image__inner {
@@ -1073,8 +1071,7 @@ onMounted(() => {
   border-radius: 5px;
   overflow: hidden;
   margin-left: 8px;
-  background: url(https://drive.mypikpak.com/assets/android.5da9a0ac.svg)
-      var(--no-repeat-center),
+  background: url(https://drive.mypikpak.com/assets/android.5da9a0ac.svg) var(--no-repeat-center),
     #fff;
   background-position: 15px center;
   padding-left: 50px;

@@ -1,5 +1,5 @@
-import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router'
-import Layout from '../views/layout/index.vue'
+import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router';
+import Layout from '../views/layout/index.vue';
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
@@ -7,55 +7,55 @@ const routes: RouteRecordRaw[] = [
     component: Layout,
     redirect: '/list',
     beforeEnter: (to, from, next) => {
-      const pikpakLogin = JSON.parse(window.localStorage.getItem('pikpakLogin') || '{}')
-      if((!pikpakLogin || !pikpakLogin.access_token) && to.name !== 'setting') {
-       next('/login')
+      const pikpakLogin = JSON.parse(window.localStorage.getItem('pikpakLogin') || '{}');
+      if ((!pikpakLogin || !pikpakLogin.access_token) && to.name !== 'setting') {
+        next('/login');
       } else {
-        next()
+        next();
       }
     },
     children: [
       {
         path: 'list/:id?',
         name: 'list',
-        component: () => import('../views/list.vue')
+        component: () => import('../views/list.vue'),
       },
       {
         path: 'video',
         name: 'video',
-        component: () => import('../views/list.vue')
+        component: () => import('../views/list.vue'),
       },
       {
         path: 'image',
         name: 'image',
-        component: () => import('../views/list.vue')
+        component: () => import('../views/list.vue'),
       },
       {
         path: 'trash',
         name: 'trash',
-        component: () => import('../views/trash.vue')
+        component: () => import('../views/trash.vue'),
       },
       {
         path: 'setting',
         name: 'setting',
-        component: () => import('../views/setting.vue')
+        component: () => import('../views/setting.vue'),
       },
       {
         path: 'invited',
         name: 'invited',
-        component: () => import('../views/invited.vue')
+        component: () => import('../views/invited.vue'),
       },
-//      {
-//         path: 'share',
-//         name: 'share',
-//         component: () => import('../views/share.vue')
-//       }
-    ]
+      //      {
+      //         path: 'share',
+      //         name: 'share',
+      //         component: () => import('../views/share.vue')
+      //       }
+    ],
   },
   {
     path: '/t/:id?',
     name: 'test',
-    component: () => import('../views/test.vue')
+    component: () => import('../views/test.vue'),
   },
   {
     path: '/s/:id/:password?',
@@ -82,11 +82,11 @@ const routes: RouteRecordRaw[] = [
     name: 'testtest',
     component: () => import('../views/testtest.vue'),
   },
-]
+];
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes
-})
+  routes,
+});
 
-export default router
+export default router;

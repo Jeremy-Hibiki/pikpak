@@ -1,13 +1,13 @@
 <template>
   <div class="container">
-    <div class="content " :class="{hide: hide}">
+    <div class="content" :class="{ hide: hide }">
       <div class="status-bar" @click="hide = !hide">
         <div class="status-bar-wrapper">
-          {{filesList?.length || 0}}项保存中 &nbsp;  <n-spin size="small" v-if="loading"/>
+          {{ filesList?.length || 0 }}项保存中 &nbsp; <n-spin v-if="loading" size="small" />
         </div>
       </div>
       <div class="task-list">
-        <n-scrollbar style="max-height: 400px;"  @scroll="scrollHandle">
+        <n-scrollbar style="max-height: 400px" @scroll="scrollHandle">
           <template v-for="(item, key) in filesList" :key="item.id">
             <div class="task">
               <div class="task-info">
@@ -16,8 +16,8 @@
                 </div>
                 <div class="task-info-wrapper">
                   <div class="task-file-name">
-                    <n-ellipsis :tooltip="{width: 'trigger'}">
-                      {{item.file_name}}
+                    <n-ellipsis :tooltip="{ width: 'trigger' }">
+                      {{ item.file_name }}
                     </n-ellipsis>
                   </div>
                   <div class="task-desc-wrapper">
@@ -26,14 +26,19 @@
                     </div>
                     <div class="task-dot"></div>
                     <div class="task-desc">
-                      {{item.message}}
+                      {{ item.message }}
                     </div>
                   </div>
                 </div>
-                <div class="task-progress" style="width: 60px; margin-right: 6px;">
-                  <n-progress type="line" :percentage="item.progress" processing indicator-placement="inside"></n-progress>
+                <div class="task-progress" style="width: 60px; margin-right: 6px">
+                  <n-progress
+                    type="line"
+                    :percentage="item.progress"
+                    processing
+                    indicator-placement="inside"
+                  ></n-progress>
                 </div>
-                <n-popconfirm @positive-click="deleteTask(key)" placement="right">
+                <n-popconfirm placement="right" @positive-click="deleteTask(key)">
                   <template #trigger>
                     <n-icon color="#306eff">
                       <circle-x></circle-x>
@@ -46,88 +51,89 @@
           </template>
         </n-scrollbar>
       </div>
-      <p class="bottom" v-if="!hide" @click="hide = true">收起</p>
-    </div> 
+      <p v-if="!hide" class="bottom" @click="hide = true">收起</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from '@vue/reactivity';
-import { onMounted, onUnmounted, watch } from '@vue/runtime-core'
-import http from '../utils/axios'
-import { NEllipsis, NScrollbar, NProgress, NIcon, NPopconfirm, NSpin } from 'naive-ui'
-import { byteConvert } from '../utils'
-import { CircleX } from '@vicons/tabler'
-  const filesList = ref()
-  const loading = ref(false)
-  const hasTask = ref(0)
-  const timeOut = ref()
-  const hide = ref(true)
-  const pageToken = ref()
-  const getTask = () => {
-    loading.value = true
-    http.get('https://api-drive.mypikpak.com/drive/v1/tasks', {
+import { CircleX } from '@vicons/tabler';
+import { NEllipsis, NIcon, NPopconfirm, NProgress, NScrollbar, NSpin } from 'naive-ui';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { byteConvert } from '../utils';
+import http from '../utils/axios';
+const filesList = ref();
+const loading = ref(false);
+const hasTask = ref(0);
+const timeOut = ref();
+const hide = ref(true);
+const pageToken = ref();
+const getTask = () => {
+  loading.value = true;
+  http
+    .get('https://api-drive.mypikpak.com/drive/v1/tasks', {
       params: {
         type: 'offline',
         filters: {
-          "phase": {"eq": "PHASE_TYPE_RUNNING"}
+          phase: { eq: 'PHASE_TYPE_RUNNING' },
         },
         page_token: pageToken.value || undefined,
         thumbnail_size: 'SIZE_LARGE',
-        with: 'reference_resource'
-      }
+        with: 'reference_resource',
+      },
     })
-      .then((res:any) => {
-        const {tasks, next_page_token} = res.data
-        timeOut.value && clearTimeout(timeOut.value)
-        if(!pageToken.value) {
-          filesList.value = []
-        }
-        filesList.value = filesList.value.concat(tasks)
-        pageToken.value = next_page_token
-        if(filesList.value.length && !hide.value) {
-          timeOut.value = setTimeout(() => {
-            getTask()
-          }, 30000)
-        }
-        loading.value = false
-      })
-  }
-  const deleteTask = (key:number) => {
-    http.delete('https://api-drive.mypikpak.com/drive/v1/tasks', {
+    .then((res: any) => {
+      const { tasks, next_page_token } = res.data;
+      timeOut.value && clearTimeout(timeOut.value);
+      if (!pageToken.value) {
+        filesList.value = [];
+      }
+      filesList.value = filesList.value.concat(tasks);
+      pageToken.value = next_page_token;
+      if (filesList.value.length && !hide.value) {
+        timeOut.value = setTimeout(() => {
+          getTask();
+        }, 30000);
+      }
+      loading.value = false;
+    });
+};
+const deleteTask = (key: number) => {
+  http
+    .delete('https://api-drive.mypikpak.com/drive/v1/tasks', {
       params: {
         task_ids: filesList.value[key].id,
-        _t: new Date().getTime()
-      }
+        _t: new Date().getTime(),
+      },
     })
-      .then(() => {
-        if(filesList.value[key].progress < 100) {
-          hasTask.value--
-        }
-        filesList.value.splice(key, 1)
-      })
-  }
-  const scrollHandle = (e:any) =>  {
-    if(e.target.offsetHeight - e.target.scrollTop < 30) {
-      if(pageToken.value && !loading.value) {
-        getTask()
+    .then(() => {
+      if (filesList.value[key].progress < 100) {
+        hasTask.value--;
       }
+      filesList.value.splice(key, 1);
+    });
+};
+const scrollHandle = (e: any) => {
+  if (e.target.offsetHeight - e.target.scrollTop < 30) {
+    if (pageToken.value && !loading.value) {
+      getTask();
     }
   }
-  watch(hide, () => {
-    if(hide.value && timeOut.value) {
-      clearTimeout(timeOut.value)
-    } else {
-      getTask()
-    }
-  })
-  onMounted(getTask)
-  onUnmounted(() => {
-    timeOut.value && clearTimeout(timeOut.value)
-  })
-  defineExpose({
-    getTask
-  })
+};
+watch(hide, () => {
+  if (hide.value && timeOut.value) {
+    clearTimeout(timeOut.value);
+  } else {
+    getTask();
+  }
+});
+onMounted(getTask);
+onUnmounted(() => {
+  timeOut.value && clearTimeout(timeOut.value);
+});
+defineExpose({
+  getTask,
+});
 </script>
 
 <style>
@@ -137,7 +143,7 @@ import { CircleX } from '@vicons/tabler'
   right: 32px;
   bottom: 28px;
 }
-@media(max-width: 968px) {
+@media (max-width: 968px) {
   .container {
     width: 100%;
     right: 0;
@@ -169,8 +175,7 @@ import { CircleX } from '@vicons/tabler'
   max-height: 530px;
   min-height: 54px;
   background: #fff;
-  box-shadow: 0 0 1px 1px rgba(28, 28, 32, 0.05),
-    0 8px 24px rgba(28, 28, 32, 0.12);
+  box-shadow: 0 0 1px 1px rgba(28, 28, 32, 0.05), 0 8px 24px rgba(28, 28, 32, 0.12);
   border-radius: 5px;
   transition: max-height 0.66s cubic-bezier(0.66, 0, 0.01, 1);
   overflow: hidden;
@@ -236,7 +241,7 @@ import { CircleX } from '@vicons/tabler'
 .task-list::before {
   display: block;
   position: sticky;
-  content: "";
+  content: '';
   height: 1px;
   top: 0;
   background: rgba(132, 133, 141, 0.08);
@@ -244,7 +249,7 @@ import { CircleX } from '@vicons/tabler'
 .task-list::after {
   display: block;
   position: absolute;
-  content: "";
+  content: '';
   height: 1px;
   top: 0;
   width: 100%;
@@ -304,7 +309,7 @@ import { CircleX } from '@vicons/tabler'
   align-items: center;
 }
 .task .task-dot::before {
-  content: "";
+  content: '';
   display: block;
   width: 2px;
   height: 2px;

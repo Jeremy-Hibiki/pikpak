@@ -1,0 +1,7 @@
+cf-worker/
+dist/
+dist-ssr/
+node_modules/
+public/
+
+.github/
